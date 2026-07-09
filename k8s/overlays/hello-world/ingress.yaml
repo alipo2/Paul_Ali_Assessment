@@ -1,0 +1,26 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: flask-hello-world
+  annotations:
+    # Shared ingress-nginx controller already running in the cluster -
+    # this just adds a routing rule, it does not provision new infra.
+    kubernetes.io/ingress.class: nginx
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - flask-hello-world.example.com # dummy URL this app responds on
+      secretName: flask-hello-world-tls
+  rules:
+    - host: flask-hello-world.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: flask-hello-world
+                port:
+                  number: 80

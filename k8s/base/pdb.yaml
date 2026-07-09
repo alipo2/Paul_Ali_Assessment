@@ -1,0 +1,9 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: flask-hello-world
+spec:
+  minAvailable: 2 # survive voluntary disruptions (node drains, upgrades)
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: flask-hello-world

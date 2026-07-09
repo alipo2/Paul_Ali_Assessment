@@ -1,0 +1,93 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flask-hello-world
+  labels:
+    app.kubernetes.io/name: flask-hello-world
+    app.kubernetes.io/component: web
+spec:
+  replicas: 3 # Baseline for HA; HPA takes over above this floor.
+  revisionHistoryLimit: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0 # Zero-downtime rollouts.
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: flask-hello-world
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: flask-hello-world
+        app.kubernetes.io/component: web
+    spec:
+      serviceAccountName: flask-hello-world
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      # Spread replicas across zones and nodes so a single node/AZ failure
+      # can't take the whole app down.
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: flask-hello-world
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: flask-hello-world
+      containers:
+        - name: flask-hello-world
+          image: REGISTRY_PLACEHOLDER/flask-hello-world:0.1.0 # overridden per-app by kustomize `images`
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+              # No hostPort/hostNetwork: the pod is never tied to a node port,
+              # all traffic is reached via the Service/Ingress below.
+          env:
+            - name: PORT
+              value: "8080"
+          # Small, right-sized footprint so many of these apps bin-pack onto
+          # shared nodes cheaply instead of each reserving a large slice.
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 20
+            failureThreshold: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}

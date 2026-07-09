@@ -1,0 +1,16 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - serviceaccount.yaml
+  - deployment.yaml
+  - service.yaml
+  - hpa.yaml
+  - pdb.yaml
+  - networkpolicy.yaml
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: assessment-demo
+      app.kubernetes.io/managed-by: kustomize
+    includeSelectors: true
